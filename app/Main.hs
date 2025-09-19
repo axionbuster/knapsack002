@@ -1,11 +1,13 @@
+{-# LANGUAGE TypeApplications #-}
 module Main (main) where
-
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.State
+import           Data.Array.IO
+import           Data.Array.Unboxed
+import           Data.Array.Unsafe
 import qualified Data.ByteString.Builder   as B
 import qualified Data.ByteString.Char8     as B
 import           GHC.Conc
-import           Growable
 import           Knap
 import           System.IO
 
@@ -23,18 +25,18 @@ nextPair = do
 
 main :: IO ()
 main = do
- gvs <- newGr
- gws <- newGr
  let
   work :: StateT B.ByteString IO B.Builder
   work = do
    capnum <- nextPair
    case capnum of
     Just (cap, num) -> do
+     dvs <- io $ newArray_ @IOUArray (0, num - 1)
+     dws <- io $ newArray_ @IOUArray (0, num - 1)
      let
       rep i | i == num = do
-       vs <- io $ freezeGr gvs; io $ resetGr gvs
-       ws <- io $ freezeGr gws; io $ resetGr gws
+       vs <- io $ unsafeFreeze @_ @_ @_ @_ @UArray dvs
+       ws <- io $ unsafeFreeze @_ @_ @_ @_ @UArray dws
        let
         -- 0x0a = line feed; 0x20 = space
         k = knap
@@ -46,8 +48,8 @@ main = do
        vw <- nextPair
        case vw of
         Just (v, w) -> do
-         io $ pushGr gvs $ fromIntegral v
-         io $ pushGr gws $ fromIntegral w
+         io $ writeArray dvs i $ fromIntegral v
+         io $ writeArray dws i $ fromIntegral w
          rep (i + 1)
         Nothing -> fail "premature termination"
      rep 0

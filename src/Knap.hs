@@ -1,17 +1,17 @@
+{-# LANGUAGE BangPatterns        #-}
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE MagicHash           #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications    #-}
 {-# LANGUAGE UnboxedTuples       #-}
-{-# LANGUAGE BangPatterns        #-}
 module Knap (knap) where
 import           Control.Monad
 import           Control.Monad.ST
 import           Data.Array.Base
 import           Data.Int
 import           GHC.Exts
-import           GHC.ST
 import           GHC.Ix
+import           GHC.ST
 
 knap
  :: forall w. (Monoid w)
@@ -27,9 +27,8 @@ knap onCount onChoice maxWeight values weights = runST entry where
   let count = succ . snd . bounds $ values
   decisions <- newArray @(STUArray s) ((0, 0 :: Int), (count, maxWeight)) False
   counts    <- newArray @(STUArray s) ((0, 0 :: Int), (count, maxWeight)) 0
-  let
-   workArr = newArray @(STUArray s) (0, maxWeight) (0 :: Int16)
-   {-# INLINE workArr #-}
+  let workArr = newArray @(STUArray s) (0, maxWeight) (0 :: Int16)
+      {-# INLINE workArr #-}
   wO@(STUArray _ _ (I# sz#) wO_) <- workArr
   wI@(STUArray _ _ _        wI_) <- workArr
   let
@@ -50,7 +49,7 @@ knap onCount onChoice maxWeight values weights = runST entry where
     knap_ (n + 1) 1
    knap_ n w | n' <- n - 1 = do
     unless (fromIntegral (weights ! n') > w) $ do
-     let w' = w - fromIntegral (weights ! n')
+     let !w' = w - fromIntegral (weights ! n')
      vtake <- ((values ! n') +) <$> readArray wI w'
      vskip <- readArray wI w
      when (vtake > vskip) $ do

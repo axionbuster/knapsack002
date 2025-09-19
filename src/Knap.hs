@@ -3,6 +3,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications    #-}
 {-# LANGUAGE UnboxedTuples       #-}
+{-# LANGUAGE BangPatterns        #-}
 module Knap (knap) where
 import           Control.Monad
 import           Control.Monad.ST
@@ -25,8 +26,7 @@ knap onCount onChoice maxWeight values weights = runST entry where
  entry = do
   let count = succ . snd . bounds $ values
   decisions <- newArray @(STUArray s) ((0, 0 :: Int), (count, maxWeight)) False
-  counts@(STUArray cl cu _ cs#) <-
-   newArray @(STUArray s) ((0, 0 :: Int), (count, maxWeight)) 0
+  counts    <- newArray @(STUArray s) ((0, 0 :: Int), (count, maxWeight)) 0
   let
    workArr = newArray @(STUArray s) (0, maxWeight) (0 :: Int16)
    {-# INLINE workArr #-}
@@ -35,16 +35,18 @@ knap onCount onChoice maxWeight values weights = runST entry where
   let
    knap_ n _ | n > count = pure ()
    knap_ n w | w > maxWeight = do
-    -- I copy the finished output row to the new input row, instead of swapping
-    -- the buffers. As a reward, I don't need to write to the row when
-    -- an item is skipped. Same thing for the counts matrix.
-    ST $ \s1 -> case safe_scale 2# sz# of
-     bytes# -> case copyMutableByteArray# wO_ 0# wI_ 0# bytes# s1 of
-      s2 -> case unsafeIndex (cl, cu) (n, 0) of
-       I# o# -> case maxWeight + 1 of
-        I# mwp1# -> case wORD_SCALE mwp1# of
-         len# -> case copyMutableByteArray# cs# o# cs# (o# +# len#) len# s2 of
-          s3 -> (# s3, () #)
+    when (n < count) $ do
+     let !(STUArray cl cu _ cs#) = counts
+         !bytes# = safe_scale 2# sz#
+         wsca (I# x#) = I# (wORD_SCALE x#)
+     let !(I# o#) = wsca (unsafeIndex (cl, cu) (n    , 0))
+         !(I# p#) = wsca (unsafeIndex (cl, cu) (n + 1, 0))
+     -- I copy the finished output row to the new input row, instead of swapping
+     -- the buffers. As a reward, I don't need to write to the row when
+     -- an item is skipped. Same thing for the counts matrix.
+     ST $ \s1 -> case copyMutableByteArray# wO_ 0# wI_ 0# bytes# s1 of
+      s2 -> case copyMutableByteArray# cs# o# cs# p# (p# -# o#) s2 of
+       s3 -> (# s3, () #)
     knap_ (n + 1) 1
    knap_ n w | n' <- n - 1 = do
     unless (fromIntegral (weights ! n') > w) $ do
@@ -55,6 +57,7 @@ knap onCount onChoice maxWeight values weights = runST entry where
       readArray counts (n', w') >>= writeArray counts (n, w) . (+ 1)
       writeArray wO w vtake
       writeArray decisions (n, w) True
+    knap_ n (w + 1)
   knap_ 1 1
   let
    recon 0 _ = mempty

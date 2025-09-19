@@ -1,18 +1,22 @@
-{-# LANGUAGE MagicHash, UnboxedTuples, ScopedTypeVariables, TypeApplications, FlexibleContexts #-}
+{-# LANGUAGE FlexibleContexts    #-}
+{-# LANGUAGE MagicHash           #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications    #-}
+{-# LANGUAGE UnboxedTuples       #-}
 module Knap (knap) where
-import Control.Monad.ST
-import Data.Array.Base
-import Data.Int
-import GHC.Exts
-import GHC.ST
+import           Control.Monad.ST
+import           Data.Array.Base
+import           Data.Int
+import           GHC.Exts
+import           GHC.ST
 
 knap
  :: forall w. (Monoid w)
  => (Int -> w) -- ^ on count (number of chosen objects)
  -> (Int -> w) -- ^ on choice (indices)
  -> Int -- ^ max weight
- -> (UArray Int Int16) -- ^ values
- -> (UArray Int Int16) -- ^ weights
+ -> UArray Int Int16 -- ^ values
+ -> UArray Int Int16 -- ^ weights
  -> w
 knap onCount onChoice maxWeight values weights = runST entry where
  entry :: forall s. ST s w
@@ -26,7 +30,7 @@ knap onCount onChoice maxWeight values weights = runST entry where
   wO@(STUArray _ _ (I# sz#) wO_) <- workArr
   wI@(STUArray _ _ _        wI_) <- workArr
   let
-   knap_ n w | n > count = pure ()
+   knap_ n _ | n > count = pure ()
    knap_ n w | w > maxWeight = do
     -- I copy the finished output row to the new input row, instead of swapping
     -- the buffers. As a reward, I don't need to write to the row when
@@ -41,7 +45,7 @@ knap onCount onChoice maxWeight values weights = runST entry where
     then bump w
     else do
      let w' = w - fromIntegral (weights ! n')
-     vtake <- (fromIntegral (values ! n') +) <$> readArray wI w'
+     vtake <- ((values ! n') +) <$> readArray wI w'
      vskip <- readArray wI w
      if vtake > vskip
      then do

@@ -1,13 +1,13 @@
 module Main (main) where
 
-import Control.Monad.Trans.State
-import Control.Monad.IO.Class
-import qualified Data.ByteString.Char8 as B
-import qualified Data.ByteString.Builder as B
-import Growable
-import Knap
-import GHC.Conc
-import System.IO
+import           Control.Monad.IO.Class
+import           Control.Monad.Trans.State
+import qualified Data.ByteString.Builder   as B
+import qualified Data.ByteString.Char8     as B
+import           GHC.Conc
+import           Growable
+import           Knap
+import           System.IO
 
 io :: (MonadIO m) => IO a -> m a
 io = liftIO

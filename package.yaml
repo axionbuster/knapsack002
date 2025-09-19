@@ -38,6 +38,7 @@ ghc-options:
 - -O2
 - -ddump-simpl
 - -dsuppress-uniques
+- -dsuppress-type-applications
 - -ddump-to-file
 
 library:

@@ -1,12 +1,13 @@
-{-# LANGUAGE MagicHash, UnboxedTuples #-}
+{-# LANGUAGE MagicHash     #-}
+{-# LANGUAGE UnboxedTuples #-}
 module Growable (Growable, newGr, pushGr, freezeGr, resetGr) where
-import Control.Monad
-import Data.Array.Base
-import Data.Array.IO.Internals
-import Data.Int
-import Data.IORef
-import GHC.Exts
-import GHC.IO
+import           Control.Monad
+import           Data.Array.Base
+import           Data.Array.IO.Internals
+import           Data.Int
+import           Data.IORef
+import           GHC.Exts
+import           GHC.IO
 
 type IA = IOUArray Int Int
 data Growable = Growable IA (IORef (IOUArray Int Int16))
@@ -33,7 +34,7 @@ pushGr :: Growable -> Int16 -> IO ()
 pushGr (Growable rn ra) x = do
  n <- readIA rn
  a@(IOUArray (STUArray _ _ cap _)) <- readIORef ra
- if (n >= cap)
+ if n >= cap
  then do
   na <- double a
   writeIORef ra na

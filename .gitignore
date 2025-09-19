@@ -7,7 +7,8 @@ dist-newstyle/
 *.so
 *.a
 *.prof
-*.eventlog
+*.eventlog*
+*.hp
 *.swp
 *~
 .DS_Store

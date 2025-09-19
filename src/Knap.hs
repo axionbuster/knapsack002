@@ -40,7 +40,7 @@ knap onCount onChoice maxWeight values weights = runST entry where
     -- an item is skipped. Same thing for the counts matrix.
     ST $ \s1 -> case safe_scale 2# sz# of
      bytes# -> case copyMutableByteArray# wO_ 0# wI_ 0# bytes# s1 of
-      s2 -> case unsafeIndex (cl, cu) (n, w) of
+      s2 -> case unsafeIndex (cl, cu) (n, 0) of
        I# o# -> case maxWeight + 1 of
         I# mwp1# -> case wORD_SCALE mwp1# of
          len# -> case copyMutableByteArray# cs# o# cs# (o# +# len#) len# s2 of
@@ -62,7 +62,7 @@ knap onCount onChoice maxWeight values weights = runST entry where
    recon n (w :: Int) | n' <- n - 1 = do
     taken <- readArray decisions (n, w)
     if taken
-    then recon n' w
-    else (onChoice n' <>) <$> recon n' (w - fromIntegral (weights ! n'))
+    then (onChoice n' <>) <$> recon n' (w - fromIntegral (weights ! n'))
+    else recon n' w
   quantum <- readArray counts (count, maxWeight)
   (onCount quantum <>) <$> recon count maxWeight

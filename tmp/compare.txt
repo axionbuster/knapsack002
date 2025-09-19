@@ -1,0 +1,15 @@
+Case 1: cap=2000
+  old k=5, V=18050, W=2329
+  new k=80, V=446434, W=39272
+  feasible? old=False new=False
+  delta V(new-old)=428384
+Case 2: cap=2000
+  old k=3, V=14517, W=1865
+  new k=74, V=384975, W=35367
+  feasible? old=True new=False
+  delta V(new-old)=370458
+Case 3: cap=2000
+  old k=4, V=22404, W=2273
+  new k=72, V=377490, W=40934
+  feasible? old=False new=False
+  delta V(new-old)=355086

@@ -45,8 +45,10 @@ pushGr (Growable rn ra) x = do
  writeIA rn (n + 1)
 
 double :: IOUArray Int Int16 -> IO (IOUArray Int Int16)
-double (IOUArray (STUArray _ _ n a#)) = IO $ \s1 ->
+double (IOUArray (STUArray _ _ n a#)) = IO $ \s1 -> do
  case n * 2 of
+  0 -> case newByteArray# 2# s1 of
+   (# s2, a2# #) -> (# s2, IOUArray (STUArray 0 0 1 a2#) #)
   n2@(I# n2#) -> case safe_scale 2# n2# of
    new# -> case resizeMutableByteArray# a# new# s1 of
     (# s2, a2# #) -> (# s2, IOUArray (STUArray 0 (n2 - 1) n2 a2#) #)

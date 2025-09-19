@@ -1,0 +1,17 @@
+.stack-work/
+dist-newstyle/
+*.hi
+*.dump-simpl
+*.o
+*.dyn_o
+*.so
+*.a
+*.prof
+*.eventlog
+*.swp
+*~
+.DS_Store
+thumbs.db
+.vscode/
+.idea/
+*.iml

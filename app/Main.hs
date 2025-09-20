@@ -7,6 +7,7 @@ import           Data.Array.Unboxed
 import           Data.Array.Unsafe
 import qualified Data.ByteString.Builder   as B
 import qualified Data.ByteString.Char8     as B
+import           Data.Int
 import           Data.List                 (intersperse)
 import           GHC.Conc
 import           Knap
@@ -16,12 +17,14 @@ io :: (MonadIO m) => IO a -> m a
 io = liftIO
 {-# INLINE io #-}
 
-nextPair :: (Monad m) => StateT B.ByteString m (Maybe (Int, Int))
+nextPair :: (Monad m) => StateT B.ByteString m (Maybe (Int16, Int16))
 nextPair = do
+ let fi = fromIntegral
+     {-# INLINE fi #-}
  bs0 <- get
  case B.readInt bs0 of
   Just (n0, bs1) -> case B.readInt (B.drop 1 bs1) of
-   Just (n1, bs2) -> do put (B.drop 1 bs2); pure $ Just (n0, n1)
+   Just (n1, bs2) -> do put (B.drop 1 bs2); pure $ Just (fi n0, fi n1)
    Nothing        -> pure Nothing
   Nothing -> pure Nothing
 
@@ -42,16 +45,16 @@ main = do
        let
         -- 0x0a = line feed; 0x20 = space
         k = knap
-         (\n -> B.intDec n <> B.word8 0x0a) -- announce count
-         (\j -> B.intDec j <> B.word8 0x20) -- announce index
+         (\n -> B.int16Dec n <> B.word8 0x0a) -- announce count
+         (\j -> B.int16Dec j <> B.word8 0x20) -- announce index
          cap vs ws
        k `par` ((k :) <$> work)
       rep i = do
        vw <- nextPair
        case vw of
         Just (v, w) -> do
-         io $ writeArray dvs i $ fromIntegral v
-         io $ writeArray dws i $ fromIntegral w
+         io $ writeArray dvs i v
+         io $ writeArray dws i w
          rep (i + 1)
         Nothing -> fail "premature termination"
      rep 0

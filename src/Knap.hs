@@ -5,72 +5,76 @@
 {-# LANGUAGE TypeApplications    #-}
 {-# LANGUAGE UnboxedTuples       #-}
 module Knap (knap, Thought, think) where
-import           Control.Monad
 import           Control.Monad.ST
 import           Data.Array.Base
 import           Data.Int
 import           GHC.Exts
-import           GHC.Ix
 import           GHC.ST
 
--- strict eval means work is done when it's forced to WHNF
+-- strict constructor means work is done when it's forced to WHNF.
+-- this is important because the `par` parallel combinator works by
+-- making this forcing process parallel.
 data Thought w = Thought !w !w -- on count, on choice
 
 think :: (Semigroup w) => Thought w -> w
 think (Thought a b) = a <> b
 
+-- | 0-1 Knapsack solver (dynamic programming).
+--
+-- Event handling:
+-- - `onCount`: header.
+-- - `onChoice`: for each index number chosen, order arbitrary.
 knap
  :: forall w. (Monoid w)
- => (Int -> w) -- ^ on count (number of chosen objects)
- -> (Int -> w) -- ^ on choice (indices)
- -> Int -- ^ max weight
- -> UArray Int Int16 -- ^ values
- -> UArray Int Int16 -- ^ weights
+ => (Int16 -> w) -- ^ on count (number of chosen objects)
+ -> (Int16 -> w) -- ^ on choice (indices)
+ -> Int16 -- ^ max weight
+ -> UArray Int16 Int16 -- ^ values
+ -> UArray Int16 Int16 -- ^ weights
  -> Thought w
 knap onCount onChoice maxWeight values weights = runST entry where
  entry :: forall s. ST s (Thought w)
  entry = do
-  let count = succ . snd . bounds $ values
-  decisions <- newArray @(STUArray s) ((0, 0 :: Int), (count, maxWeight)) False
-  counts    <- newArray @(STUArray s) ((0, 0 :: Int), (count, maxWeight)) 0
-  let workAr = newArray @(STUArray s) (0, maxWeight) (0 :: Int16)
-      {-# INLINE workAr #-}
-  wO@(STUArray _ _ (I# sz#) wO_) <- workAr
-  wI@(STUArray _ _ _        wI_) <- workAr
+  let !count = succ . snd . bounds $ values
+  -- an item at (n, w) is taken if and only if readArray counts (n, w)
+  -- returns a negative number. note that every item has a positive value.
+  counts <- newArray @(STUArray s) ((0, 0), (count, maxWeight)) 0
+  -- wO and wI contain sums of values, and, so, they can grow really big.
+  wO <- newArray @(STUArray s) (0, maxWeight) (0 :: Int32)
+  wI <- newArray @(STUArray s) (0, maxWeight) (0 :: Int32)
   let
    knap_ n _ | n > count = pure ()
    knap_ n w | w > maxWeight = do
-    when (n < count) $ do
-     let !(STUArray cl cu _ cs#) = counts
-         !bytes# = safe_scale 2# sz#
-         wsca (I# x#) = I# (wORD_SCALE x#)
-     let !(I# o#) = wsca (unsafeIndex (cl, cu) (n    , 0))
-         !(I# p#) = wsca (unsafeIndex (cl, cu) (n + 1, 0))
-     -- I copy the finished output row to the new input row, instead of swapping
-     -- the buffers. As a reward, I don't need to write to the row when
-     -- an item is skipped. Same thing for the counts matrix.
-     ST $ \s1 -> case copyMutableByteArray# wO_ 0# wI_ 0# bytes# s1 of
-      s2 -> case copyMutableByteArray# cs# o# cs# p# (p# -# o#) s2 of
-       s3 -> (# s3, () #)
+    let !(STUArray _ _ (I# sz#) wI_) = wI
+        !(STUArray _ _ _        wO_) = wO
+    -- copy the working memory so that when i skip an item the decision is
+    -- just copied. but it's such bullshit the standard library lacks memcpy
+    -- so i have to reach out to a primitive.
+    ST $ \s1 ->
+     case copyMutableByteArray# wO_ 0# wI_ 0# (safe_scale 4# sz#) s1 of
+      s2 -> (# s2, () #)
     knap_ (n + 1) 1
    knap_ n w | n' <- n - 1 = do
-    unless (fromIntegral (weights ! n') > w) $ do
-     let !w' = w - fromIntegral (weights ! n')
-     vtake <- ((values ! n') +) <$> readArray wI w'
+    if w - (weights ! n') >= 0 -- values are too small to overflow
+    then do
+     let !w' = w - (weights ! n')
+     vtake <- (fromIntegral (values ! n') +) <$> readArray wI w'
      vskip <- readArray wI w
-     when (vtake > vskip) $ do
-      readArray counts (n', w') >>= writeArray counts (n, w) . (+ 1)
+     if vtake > vskip
+     then do
+      readArray counts (n', w') >>= writeArray counts (n, w).negate.(+ 1).abs
       writeArray wO w vtake
-      writeArray decisions (n, w) True
+     else readArray counts (n', w) >>= writeArray counts (n, w) . abs
+    else  readArray counts (n', w) >>= writeArray counts (n, w) . abs
     knap_ n (w + 1)
   knap_ 1 1
   let
    recon 0 _ = mempty
    recon _ 0 = mempty
-   recon n (w :: Int) | n' <- n - 1 = do
-    taken <- readArray decisions (n, w)
-    if taken
-    then (onChoice n' <>) <$> recon n' (w - fromIntegral (weights ! n'))
+   recon n w | n' <- n - 1 = do
+    taken <- readArray counts (n, w)
+    if taken < 0
+    then (onChoice n' <>) <$> recon n' (w - (weights ! n'))
     else recon n' w
-  quantum <- readArray counts (count, maxWeight)
+  quantum <- abs <$> readArray counts (count, maxWeight)
   Thought (onCount quantum) <$> recon count maxWeight

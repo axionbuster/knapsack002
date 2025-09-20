@@ -57,6 +57,23 @@ executable knapsack002-exe
     , transformers
   default-language: Haskell2010
 
+executable knapsack002-gen
+  main-is: Main.hs
+  other-modules:
+      Paths_knapsack002
+  autogen-modules:
+      Paths_knapsack002
+  hs-source-dirs:
+      gen
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -O2 -ddump-simpl -dsuppress-uniques -dsuppress-type-applications -ddump-to-file -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      array
+    , base >=4.7 && <5
+    , bytestring
+    , mtl
+    , transformers
+  default-language: Haskell2010
+
 test-suite knapsack002-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs

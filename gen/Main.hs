@@ -49,7 +49,7 @@ case1 granularity = swap . execRWS entry () where
  entry = do
   nentry <- state $ unif (1, 2000)
   capaci <- state $ unif (1, 2000)
-  pair nentry capaci
+  pair capaci nentry
   let
    go i = when (i < nentry) $ do
     value  <- state $ expo 10000 granularity

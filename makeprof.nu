@@ -29,6 +29,6 @@ def main [seed_?: int, granularity_?: int] {
  cd ("prof" + $snum)
  stack --work-dir .stack-work-prof --profile exec knapsack002-gen -- $seed $granularity
   | stack --work-dir .stack-work-prof --profile exec knapsack002-exe -- +RTS -p -s -lf -hc
-  | save -f "knapsack002.out.tmp" # change extension to avoid checking in
+  | save -f "knapsack.out.tmp" # change extension to avoid checking in
  cd ..
 }

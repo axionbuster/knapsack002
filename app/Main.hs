@@ -7,7 +7,7 @@ import           Data.Array.Unboxed
 import           Data.Array.Unsafe
 import qualified Data.ByteString.Builder   as B
 import qualified Data.ByteString.Char8     as B
-import           Data.Int
+import           Data.Functor
 import           Data.List                 (intersperse)
 import           GHC.Conc
 import           Knap
@@ -17,16 +17,18 @@ io :: (MonadIO m) => IO a -> m a
 io = liftIO
 {-# INLINE io #-}
 
-nextPair :: (Monad m) => StateT B.ByteString m (Maybe (Int16, Int16))
+nextPair :: (Integral i, Monad m) => StateT B.ByteString m (Maybe (i, i))
 nextPair = do
- let fi = fromIntegral
-     {-# INLINE fi #-}
- bs0 <- get
- case B.readInt bs0 of
-  Just (n0, bs1) -> case B.readInt (B.drop 1 bs1) of
-   Just (n1, bs2) -> do put (B.drop 1 bs2); pure $ Just (fi n0, fi n1)
-   Nothing        -> pure Nothing
-  Nothing -> pure Nothing
+ let
+  it bs0 = do
+   (n0, bs1) <- B.readInt bs0
+   (n1, bs2) <- B.readInt (B.drop 1 bs1)
+   pure ((fromIntegral n0, fromIntegral n1), B.drop 1 bs2)
+ res <- get <&> it
+ case res of
+  Just ((n0, n1), bs2) -> put bs2 $> Just (n0, n1)
+  Nothing              -> pure Nothing
+{-# INLINE nextPair #-}
 
 main :: IO ()
 main = do

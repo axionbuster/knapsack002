@@ -8,8 +8,6 @@ module Knap (knap, Thought, think) where
 import           Control.Monad.ST
 import           Data.Array.Base
 import           Data.Int
-import           GHC.Exts
-import           GHC.ST
 
 -- strict constructor means work is done when it's forced to WHNF.
 -- this is important because the `par` parallel combinator works by
@@ -36,25 +34,14 @@ knap onCount onChoice maxWeight values weights = runST entry where
  entry :: forall s. ST s (Thought w)
  entry = do
   let !count = succ . snd . bounds $ values
-  -- an item at (n, w) is taken if and only if readArray counts (n, w)
-  -- returns a negative number. note that every item has a positive value.
-  counts <- newArray @(STUArray s) ((0, 0), (count, maxWeight)) 0
-  -- wO and wI contain sums of values, and, so, they can grow really big.
-  wO <- newArray @(STUArray s) (0, maxWeight) (0 :: Int32)
-  wI <- newArray @(STUArray s) (0, maxWeight) (0 :: Int32)
+  taken <- newArray @(STUArray s) ((0, 0), (count, maxWeight)) False
+  -- w1 and w2 contain sums of values, and, so, they can grow really big.
+  w1 <- newArray @(STUArray s) (0, maxWeight) (0 :: Int32)
+  w2 <- newArray @(STUArray s) (0, maxWeight) (0 :: Int32)
   let
-   knap_ n _ | n > count = pure ()
-   knap_ n w | w > maxWeight = do
-    let !(STUArray _ _ (I# sz#) wI_) = wI
-        !(STUArray _ _ _        wO_) = wO
-    -- copy the working memory so that when i skip an item the decision is
-    -- just copied. but it's such bullshit the standard library lacks memcpy
-    -- so i have to reach out to a primitive.
-    ST $ \s1 ->
-     case copyMutableByteArray# wO_ 0# wI_ 0# (safe_scale 4# sz#) s1 of
-      s2 -> (# s2, () #)
-    knap_ (n + 1) 1
-   knap_ n w | n' <- n - 1 = do
+   knap_ n _ _  _  | n > count = pure ()
+   knap_ n w wO wI | w > maxWeight = knap_ (n + 1) 1 wI wO
+   knap_ n w wO wI | n' <- n - 1 = do
     if w - (weights ! n') >= 0 -- values are too small to overflow
     then do
      let !w' = w - (weights ! n')
@@ -62,19 +49,22 @@ knap onCount onChoice maxWeight values weights = runST entry where
      vskip <- readArray wI w
      if vtake > vskip
      then do
-      readArray counts (n', w') >>= writeArray counts (n, w).negate.(+ 1).abs
+      writeArray taken (n, w) True
       writeArray wO w vtake
-     else readArray counts (n', w) >>= writeArray counts (n, w) . abs
-    else  readArray counts (n', w) >>= writeArray counts (n, w) . abs
-    knap_ n (w + 1)
-  knap_ 1 1
+     else readArray wI w >>= writeArray wO w
+    else  readArray wI w >>= writeArray wO w
+    knap_ n (w + 1) wO wI
+  knap_ 1 1 w1 w2
   let
-   recon 0 _ = mempty
-   recon _ 0 = mempty
-   recon n w | n' <- n - 1 = do
-    taken <- readArray counts (n, w)
-    if taken < 0
-    then (onChoice n' <>) <$> recon n' (w - (weights ! n'))
-    else recon n' w
-  quantum <- abs <$> readArray counts (count, maxWeight)
-  Thought (onCount quantum) <$> recon count maxWeight
+   release c = pure . Thought (onCount c)
+   recon 0 _ !c x = release c x
+   recon _ 0 !c x = release c x
+   recon n w !c x | n' <- n - 1 = do
+    -- [order]:
+    --  onChoice n' <> x -- good
+    --  x <> onChoice n' -- bad! alloc-fest!
+    t <- readArray taken (n, w)
+    if t
+    then recon n' (w - (weights ! n')) (c + 1) (onChoice n' <> x) -- [order]
+    else recon n' w c x
+  recon count maxWeight 0 mempty

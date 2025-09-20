@@ -3,7 +3,9 @@
 # Build and run the Haskell knapsack002 program with profiling enabled
 # in a fresh directory (so it won't overwrite old data).
 
+mkdir profs
 stack --work-dir .stack-work-prof --profile build
+cd profs
 
 def main [seed_?: int, granularity_?: int] {
  let seed = match $seed_ {

@@ -63,7 +63,7 @@ main = do
  let
   granbad gran =
    "granularity of " ++ gran ++
-   " is either illegible or outside of the valid range of [1, 10000]"
+   " is either illegible or outside of the valid range of [1, 10000]."
   help = "\nhelp: (program) (seed: Word64) [granularity: Double(1..10000)]."
  (seed, gran) <- do
   args <- getArgs

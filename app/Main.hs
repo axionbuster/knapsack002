@@ -13,6 +13,7 @@ import           System.IO
 
 io :: (MonadIO m) => IO a -> m a
 io = liftIO
+{-# INLINE io #-}
 
 nextPair :: (Monad m) => StateT B.ByteString m (Maybe (Int, Int))
 nextPair = do

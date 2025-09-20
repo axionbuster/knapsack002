@@ -25,7 +25,7 @@ def main [seed_?: int, granularity_?: int] {
  # find the number to use. directory scheme: zprof001, zprof002, ...
  let num = (ls | where $it.name =~ '^zprof\d+$' | length) + 1
  let snum = $num | fill --alignment right --character '0' --width 3
- let dirnam = "prof" + $snum
+ let dirnam = "zprof" + $snum
  mkdir $dirnam; cd $dirnam
  stack --work-dir .stack-work-prof --profile exec knapsack002-gen -- $seed $granularity
   | stack --work-dir .stack-work-prof --profile exec knapsack002-exe -- +RTS -p -s -lf -hc

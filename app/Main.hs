@@ -7,6 +7,7 @@ import           Data.Array.Unboxed
 import           Data.Array.Unsafe
 import qualified Data.ByteString.Builder   as B
 import qualified Data.ByteString.Char8     as B
+import           Data.List                 (intersperse)
 import           GHC.Conc
 import           Knap
 import           System.IO
@@ -27,7 +28,7 @@ nextPair = do
 main :: IO ()
 main = do
  let
-  work :: StateT B.ByteString IO B.Builder
+  work :: StateT B.ByteString IO [Thought B.Builder]
   work = do
    capnum <- nextPair
    case capnum of
@@ -43,8 +44,8 @@ main = do
         k = knap
          (\n -> B.intDec n <> B.word8 0x0a) -- announce count
          (\j -> B.intDec j <> B.word8 0x20) -- announce index
-         cap vs ws <> B.word8 0x0a
-       k `par` ((k <>) <$> work)
+         cap vs ws
+       k `par` ((k :) <$> work)
       rep i = do
        vw <- nextPair
        case vw of
@@ -55,4 +56,8 @@ main = do
         Nothing -> fail "premature termination"
      rep 0
     Nothing -> pure mempty
- B.getContents >>= evalStateT work >>= B.hPutBuilder stdout
+ B.getContents >>= evalStateT work >>=
+  B.hPutBuilder stdout .
+  mconcat .
+  intersperse (B.word8 0x0a) .
+  map think

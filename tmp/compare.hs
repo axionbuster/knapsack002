@@ -1,6 +1,6 @@
-import System.Environment (getArgs)
-import Control.Monad (forM_)
-import Data.List (foldl')
+import           Control.Monad      (forM_)
+import           Data.List          (foldl')
+import           System.Environment (getArgs)
 
 readInts :: String -> [Int]
 readInts = map read . words
@@ -17,9 +17,9 @@ parseCases (c:n:rest) =
 parseCases xs = ([], xs)
 
 toPairs :: [Int] -> [(Int,Int)]
-toPairs [] = []
+toPairs []       = []
 toPairs (a:b:xs) = (a,b):toPairs xs
-toPairs _ = []
+toPairs _        = []
 
 -- outputs: [count, indices...] per case (two lines per case)
 parseOut :: String -> [[Int]]
@@ -40,7 +40,7 @@ main = do
   args <- getArgs
   let [inp, oldOut, newOut] = case args of
         [a,b,c] -> [a,b,c]
-        _ -> ["tmp/large01.in","tmp/large01.out","tmp/large01.new.out"]
+        _       -> ["tmp/large01.in","tmp/large01.out","tmp/large01.new.out"]
   sIn <- readFile inp
   let ints = readInts sIn
   let (cases, _) = parseCases ints

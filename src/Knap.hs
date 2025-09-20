@@ -4,7 +4,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications    #-}
 {-# LANGUAGE UnboxedTuples       #-}
-module Knap (knap) where
+module Knap (knap, Thought, think) where
 import           Control.Monad
 import           Control.Monad.ST
 import           Data.Array.Base
@@ -13,6 +13,12 @@ import           GHC.Exts
 import           GHC.Ix
 import           GHC.ST
 
+-- strict eval means work is done when it's forced to WHNF
+data Thought w = Thought !w !w -- on count, on choice
+
+think :: (Semigroup w) => Thought w -> w
+think (Thought a b) = a <> b
+
 knap
  :: forall w. (Monoid w)
  => (Int -> w) -- ^ on count (number of chosen objects)
@@ -20,17 +26,17 @@ knap
  -> Int -- ^ max weight
  -> UArray Int Int16 -- ^ values
  -> UArray Int Int16 -- ^ weights
- -> w
+ -> Thought w
 knap onCount onChoice maxWeight values weights = runST entry where
- entry :: forall s. ST s w
+ entry :: forall s. ST s (Thought w)
  entry = do
   let count = succ . snd . bounds $ values
   decisions <- newArray @(STUArray s) ((0, 0 :: Int), (count, maxWeight)) False
   counts    <- newArray @(STUArray s) ((0, 0 :: Int), (count, maxWeight)) 0
-  let workArr = newArray @(STUArray s) (0, maxWeight) (0 :: Int16)
-      {-# INLINE workArr #-}
-  wO@(STUArray _ _ (I# sz#) wO_) <- workArr
-  wI@(STUArray _ _ _        wI_) <- workArr
+  let workAr = newArray @(STUArray s) (0, maxWeight) (0 :: Int16)
+      {-# INLINE workAr #-}
+  wO@(STUArray _ _ (I# sz#) wO_) <- workAr
+  wI@(STUArray _ _ _        wI_) <- workAr
   let
    knap_ n _ | n > count = pure ()
    knap_ n w | w > maxWeight = do
@@ -67,4 +73,4 @@ knap onCount onChoice maxWeight values weights = runST entry where
     then (onChoice n' <>) <$> recon n' (w - fromIntegral (weights ! n'))
     else recon n' w
   quantum <- readArray counts (count, maxWeight)
-  (onCount quantum <>) <$> recon count maxWeight
+  Thought (onCount quantum) <$> recon count maxWeight

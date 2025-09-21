@@ -20,15 +20,15 @@ knap
  :: (Monoid w)
  => (Int16 -> w)
  -> (Int16 -> w)
- -> UArray Int Int16
- -> UArray Int Int16
  -> Int16
+ -> UArray Int16 Int16
+ -> UArray Int16 Int16
  -> Thought w
-knap onCount onChoice values weights (unI16 -> maxWeight) = runST entry where
+knap onCount onChoice (unI16 -> maxWeight) values weights = runST entry where
  entry = do
   let
    realNWords = ceilq (maxWeight + 1)
-   count = succ . snd . bounds $ values
+   count = unI16 . succ . snd . bounds $ values
    newM (I# sz#) = ST $ \s0 -> case newByteArray# sz# s0 of
     (# s1, mba# #) -> case setByteArray# mba# 0# sz# 0# s1 of
      s2 -> (# s2, M mba# #)
@@ -40,8 +40,8 @@ knap onCount onChoice values weights (unI16 -> maxWeight) = runST entry where
    go n = when (n <= count) $ do
     let
      !(# vo#, vi# #) | odd n = (# v1#, v2# #) | otherwise = (# v2#, v1# #)
-     vn = unI16 $ values  ! (n - 1)
-     wn = unI16 $ weights ! (n - 1)
+     vn = unI16 $ values  ! int16 (n - 1)
+     wn = unI16 $ weights ! int16 (n - 1)
     knapRow taken# vo# vi# n vn wn maxWeight
     go (n + 1)
    release c = pure . Thought (onCount (int16 c))
@@ -53,7 +53,12 @@ knap onCount onChoice values weights (unI16 -> maxWeight) = runST entry where
       (# s1, word# #) -> case word# `and#` bOOL_BIT wx# of
        bit# -> (# s1, isTrue# (bit# `neWord#` 0##) #)
     if t
-    then recon n' (w - unI16 (weights ! n')) (c + 1) (onChoice (int16 n') <> m)
+    then do
+     recon
+      n'
+      (w - unI16 (weights ! int16 n'))
+      (c + 1)
+      (onChoice (int16 n') <> m)
     else recon n' w c m
   go 1
   recon count maxWeight 0 mempty

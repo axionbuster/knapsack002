@@ -8,7 +8,7 @@ import           Data.Array.Unsafe
 import qualified Data.ByteString.Builder as B
 import           Data.List               (intersperse)
 import           GHC.Conc
-import           Knap2
+import           Knap
 import           Parse
 import           System.IO
 

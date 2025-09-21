@@ -26,6 +26,7 @@ source-repository head
 library
   exposed-modules:
       Knap
+      Knap2
   other-modules:
       Paths_knapsack002
   autogen-modules:

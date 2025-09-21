@@ -33,8 +33,8 @@ knap onCount onChoice (unI16 -> maxWeight) values weights = runST entry where
     (# s1, mba# #) -> case setByteArray# mba# 0# sz# 0# s1 of
      s2 -> (# s2, M mba# #)
   M taken# <- newM (wordScale ((count + 1) * realNWords))
-  M v1#    <- newM ((maxWeight + 1) .<<. 1) -- Int16
-  M v2#    <- newM ((maxWeight + 1) .<<. 1) -- Int16
+  M v1#    <- newM ((maxWeight + 1) .<<. 2) -- Int32
+  M v2#    <- newM ((maxWeight + 1) .<<. 2) -- Int32
   let
    int16 = fromIntegral
    go n = when (n <= count) $ do
@@ -92,7 +92,7 @@ knapRow taken# vo# vi# n vn wn wmax = do
  -- we allow overlapping with the first word where decisions are made.
  ST $ \s0 ->
   case wmax + 1 `min` wn of
-   I# x -> case safe_scale 2# x of
+   I# x -> case safe_scale 4# x of
     -- copyMutableByteArray#: source -> dest
     fill# -> case copyMutableByteArray# vi# 0# vo# 0# fill# s0 of
      s1 -> (# s1, () #)
@@ -100,16 +100,16 @@ knapRow taken# vo# vi# n vn wn wmax = do
   writeW (I# i#) (W# p#) = ST $ \s0 ->
    case writeWordArray# taken# i# p# s0 of
     s1 -> (# s1, () #)
-  write16 (I# i#) (I# v#) = ST $ \s0 ->
-   case writeInt16Array# vo# i# (intToInt16# v#) s0 of
+  write32 (I# i#) (I# v#) = ST $ \s0 ->
+   case writeInt32Array# vo# i# (intToInt32# v#) s0 of
     s1 -> (# s1, () #)
-  read16 (I# i#) = ST $ \s0 -> case readInt16Array# vi# i# s0 of
-   (# s1, i16# #) -> (# s1, I# (int16ToInt# i16#) #)
+  read32 (I# i#) = ST $ \s0 -> case readInt32Array# vi# i# s0 of
+   (# s1, i32# #) -> (# s1, I# (int32ToInt# i32#) #)
   indexW w = realNWords * n + floorq w
   boolToW = fromIntegral . fromEnum
   go w k p | w <= wmax = do
-   vtake <- (vn +) <$> read16 (w - wn)
-   vskip <-            read16  w
+   vtake <- (vn +) <$> read32 (w - wn)
+   vskip <-            read32  w
    let
     -- record this bit, flush if needed, and then move on.
     next x
@@ -117,8 +117,8 @@ knapRow taken# vo# vi# n vn wn wmax = do
      | x             = go (w + 1) (k + 1) (setBit p k)
      | otherwise     = go (w + 1) (k + 1) p
    if vtake > vskip
-   then write16 w vtake >> next True
-   else write16 w vskip >> next False
+   then write32 w vtake >> next True
+   else write32 w vskip >> next False
   go w _ p = writeW (indexW (w - 1)) p
  let gap = wn - wordBits * floorq wn
  go wn gap 0

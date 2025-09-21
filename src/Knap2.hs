@@ -32,6 +32,7 @@ knap onCount onChoice (unI16 -> maxWeight) values weights = runST entry where
    newM (I# sz#) = ST $ \s0 -> case newByteArray# sz# s0 of
     (# s1, mba# #) -> case setByteArray# mba# 0# sz# 0# s1 of
      s2 -> (# s2, M mba# #)
+   {-# INLINE newM #-}
   M taken# <- newM (wordScale ((count + 1) * realNWords))
   M v1#    <- newM ((maxWeight + 1) .<<. 2) -- Int32
   M v2#    <- newM ((maxWeight + 1) .<<. 2) -- Int32
@@ -65,6 +66,7 @@ knap onCount onChoice (unI16 -> maxWeight) values weights = runST entry where
 
 unI16 :: Int16 -> Int
 unI16 = fromIntegral
+{-# INLINE unI16 #-}
 
 wordScale :: Int -> Int
 wordScale (I# x#) = I# (wORD_SCALE x#)
@@ -80,7 +82,7 @@ ceilq  i = (i + wordBits - 1) `quot` wordBits
 floorq i = i `quot` wordBits
 
 knapRow :: M# s -> M# s -> M# s -> Int -> Int -> Int -> Int -> ST s ()
-knapRow taken# vo# vi# n vn wn wmax = do
+knapRow taken# vo# vi# n !vn !wn wmax = do
  let realNWords = ceilq (wmax + 1)
  -- example situation: each dot represents a byte. 4 words (64-bit) shown.
  -- ........|........|........|........| w  ([0,255])
@@ -103,8 +105,10 @@ knapRow taken# vo# vi# n vn wn wmax = do
   write32 (I# i#) (I# v#) = ST $ \s0 ->
    case writeInt32Array# vo# i# (intToInt32# v#) s0 of
     s1 -> (# s1, () #)
+  {-# INLINE write32 #-}
   read32 (I# i#) = ST $ \s0 -> case readInt32Array# vi# i# s0 of
    (# s1, i32# #) -> (# s1, I# (int32ToInt# i32#) #)
+  {-# INLINE read32 #-}
   indexW w = realNWords * n + floorq w
   boolToW = fromIntegral . fromEnum
   go w k p | w <= wmax = do
@@ -116,9 +120,10 @@ knapRow taken# vo# vi# n vn wn wmax = do
      | k == wordBits = writeW (indexW (w - 1)) p >> go (w + 1) 1 (boolToW x)
      | x             = go (w + 1) (k + 1) (setBit p k)
      | otherwise     = go (w + 1) (k + 1) p
+    {-# INLINE next #-}
    if vtake > vskip
    then write32 w vtake >> next True
    else write32 w vskip >> next False
   go w _ p = writeW (indexW (w - 1)) p
- let gap = wn - wordBits * floorq wn
+ let !gap = wn - wordBits * floorq wn
  go wn gap 0

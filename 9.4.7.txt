@@ -1,0 +1,15 @@
+build main
+build prof
+pre-run
+32µs 750ns
+run (no profile)
+17µs 500ns
+pre-run (with profile)
+46µs 834ns
+run (with profile)
+56µs 292ns
+done
+╭───┬────────────╮
+│ 0 │ 17µs 500ns │
+│ 1 │ 56µs 292ns │
+╰───┴────────────╯

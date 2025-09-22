@@ -1,0 +1,16 @@
+Using LLVM 14
+build main
+build prof
+pre-run
+34µs 417ns
+run (no profile)
+18µs 417ns
+pre-run (with profile)
+32µs 83ns
+run (with profile)
+19µs 334ns
+done
+╭───┬────────────╮
+│ 0 │ 18µs 417ns │
+│ 1 │ 19µs 334ns │
+╰───┴────────────╯

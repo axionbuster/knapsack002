@@ -11,6 +11,15 @@ import           Data.Int
 import           GHC.Exts
 import           GHC.ST
 
+-- | 'GHC.Conc.par' is used in \'Main.hs\' for deterministic parallelism.
+-- @a `par` b@ works by beginning the reduction of @a@ in a spark that will
+-- be evaluated in parallel as @b@ is evaluated. otherwise, it's the same
+-- as @b@. in particular, @_|_ `bar` b@ is equal to @b@ (so it's not `seq`).
+--
+-- we are using 'GHC.Conc.par' to make the evalaluation of 'knap' work
+-- in parallel. and by making this require a strict constructor, we know that
+-- when a \'thought\' is foced, its two fields will also be forced, and that's
+-- when 'knap' will actually begin working.
 data Thought a = Thought !a !a
 
 think :: (Semigroup a) => Thought a -> a
@@ -18,11 +27,11 @@ think (Thought a b) = a <> b
 
 knap
  :: (Monoid w)
- => (Int16 -> w)
- -> (Int16 -> w)
- -> Int16
- -> UArray Int16 Int16
- -> UArray Int16 Int16
+ => (Int16 -> w) -- ^ handle count announcement
+ -> (Int16 -> w) -- ^ handle choice (index) announcement
+ -> Int16 -- ^ max weight
+ -> UArray Int16 Int16 -- ^ values (0-indexed)
+ -> UArray Int16 Int16 -- ^ weights (0-indexed)
  -> Thought w
 knap onCount onChoice (unI16 -> maxWeight) values weights = runST entry where
  entry = do

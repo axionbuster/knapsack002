@@ -3,7 +3,6 @@
 {-# LANGUAGE UnboxedTuples #-}
 {-# LANGUAGE ViewPatterns  #-}
 module Knap (Thought, think, knap) where
-
 import           Control.Monad
 import           Data.Array.Base
 import           Data.Bits
@@ -42,11 +41,19 @@ knap onCount onChoice (unI16 -> maxWeight) values weights = runST entry where
     (# s1, mba# #) -> case setByteArray# mba# 0# sz# 0# s1 of
      s2 -> (# s2, M mba# #)
    {-# INLINE newM #-}
+   int16 = fromIntegral
+   {-# INLINE int16 #-}
+   release c = pure . Thought (onCount (int16 c))
+  -- we use a matrix of decisions (bools) packed into a bitset. note that this
+  -- bitset is aligned to the word size boundary. this is important for a number
+  -- of unsafe operations in knapRow. for the actual optimal values, we store
+  -- them in two running rows and swap them every time. now note that
+  -- w_max <= 10_000, n <= 3_000. the product w_max * n does not fit in an Int16
+  -- so we use an Int32 array.
   M taken# <- newM (wordScale ((count + 1) * realNWords))
   M v1#    <- newM ((maxWeight + 1) .<<. 2) -- Int32
   M v2#    <- newM ((maxWeight + 1) .<<. 2) -- Int32
   let
-   int16 = fromIntegral
    go n = when (n <= count) $ do
     let
      !(# vo#, vi# #) | odd n = (# v1#, v2# #) | otherwise = (# v2#, v1# #)
@@ -54,10 +61,11 @@ knap onCount onChoice (unI16 -> maxWeight) values weights = runST entry where
      wn = unI16 $ weights ! int16 (n - 1)
     knapRow taken# vo# vi# n vn wn maxWeight
     go (n + 1)
-   release c = pure . Thought (onCount (int16 c))
+  let
    recon 0 _ !c m = release c m
    recon _ 0 !c m = release c m
    recon n w !c m | n' <- n - 1 = do
+    -- read a single bit from the bitset.
     t <- ST $ \s0 -> case n * realNWords * wordBits + w of
      I# wx# -> case readWordArray# taken# (bOOL_INDEX wx#) s0 of
       (# s1, word# #) -> case word# `and#` bOOL_BIT wx# of
@@ -70,6 +78,8 @@ knap onCount onChoice (unI16 -> maxWeight) values weights = runST entry where
       (c + 1)
       (onChoice (int16 n') <> m)
     else recon n' w c m
+  -- so it's really easy. first we find the decision matrix, then we walk it
+  -- backwards, reconstructing our choices.
   go 1
   recon count maxWeight 0 mempty
 
@@ -90,6 +100,7 @@ ceilq, floorq :: Int -> Int
 ceilq  i = (i + wordBits - 1) `quot` wordBits
 floorq i = i `quot` wordBits
 
+-- a "row" means we fix the 'n' subproblem parameter.
 knapRow :: M# s -> M# s -> M# s -> Int -> Int -> Int -> Int -> ST s ()
 knapRow taken# vo# vi# n !vn !wn wmax = do
  let realNWords = ceilq (wmax + 1)
@@ -100,7 +111,11 @@ knapRow taken# vo# vi# n !vn !wn wmax = do
  --             ?????|????????|????????| decide
  --
  -- this step pertains to the "unconditionally skip" part.
- -- we allow overlapping with the first word where decisions are made.
+ -- see the decision bits stay as 0 (don't take). we 0-initialize that bitset
+ -- so we do nothing on it. and as to the optimum values for each subproblem
+ -- (by varying weights), we just copy the optimum values from the previous
+ -- row (n - 1). note: it doesn't hurt to copy too much, but copying too little
+ -- is incorrect.
  ST $ \s0 ->
   case wmax + 1 `min` wn of
    I# x -> case safe_scale 4# x of
@@ -120,6 +135,10 @@ knapRow taken# vo# vi# n !vn !wn wmax = do
   {-# INLINE read32 #-}
   indexW w = realNWords * n + floorq w
   boolToW = fromIntegral . fromEnum
+ let
+  -- it's really important that the bitset is aligned to the word boundary.
+  -- or else, memory access here can cause an "unchecked exception" (~
+  -- undefined behavior).
   go w k p | w <= wmax = do
    vtake <- (vn +) <$> read32 (w - wn)
    vskip <-            read32  w
@@ -134,5 +153,5 @@ knapRow taken# vo# vi# n !vn !wn wmax = do
    then write32 w vtake >> next True
    else write32 w vskip >> next False
   go w _ p = writeW (indexW (w - 1)) p
- let !gap = wn - wordBits * floorq wn
- go wn gap 0
+ -- we take a little bit of shortcut by starting in the middle of the word.
+ go wn (wn - wordBits * floorq wn) 0

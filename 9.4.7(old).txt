@@ -1,16 +1,15 @@
-Using the native code generator
 build main
 build prof
 pre-run
-32µs 583ns
+32µs 750ns
 run (no profile)
-16µs 875ns
+17µs 500ns
 pre-run (with profile)
-26µs 125ns
+46µs 834ns
 run (with profile)
-16µs 125ns
+56µs 292ns
 done
 ╭───┬────────────╮
-│ 0 │ 16µs 875ns │
-│ 1 │ 16µs 125ns │
+│ 0 │ 17µs 500ns │
+│ 1 │ 56µs 292ns │
 ╰───┴────────────╯

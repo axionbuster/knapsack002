@@ -1,16 +1,55 @@
-{-# LANGUAGE BangPatterns  #-}
-{-# LANGUAGE MagicHash     #-}
-{-# LANGUAGE UnboxedTuples #-}
-{-# LANGUAGE ViewPatterns  #-}
-module Knap (Thought, think, knap) where
+{-# LANGUAGE BangPatterns     #-}
+{-# LANGUAGE MagicHash        #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE UnboxedTuples    #-}
+{-# LANGUAGE ViewPatterns     #-}
+module Knap (main_) where
+import           Control.Applicative
 import           Control.Monad
+import           Control.Monad.IO.Class
 import           Data.Array.Base
+import           Data.Array.IO
 import           Data.Bits
+import qualified Data.ByteString.Builder as B
 import           Data.Int
+import           Data.List               (intersperse)
+import           GHC.Conc
 import           GHC.Exts
 import           GHC.ST
+import           Parse
+import           System.IO
 
--- | 'GHC.Conc.par' is used in \'Main.hs\' for deterministic parallelism.
+main_ :: IO ()
+main_ = do
+ let
+  work = do
+   (cap, num) <- pair
+   dvs <- liftIO $ newArray_ @IOUArray (0, num - 1)
+   dws <- liftIO $ newArray_ @IOUArray (0, num - 1)
+   let
+    rep i | i == num = do
+     vs <- liftIO $ unsafeFreeze @_ @_ @_ @_ @UArray dvs
+     ws <- liftIO $ unsafeFreeze @_ @_ @_ @_ @UArray dws
+     let
+      -- 0x0a = line feed; 0x20 = space
+      k = knap
+       (\n -> B.int16Dec n <> B.word8 0x0a) -- announce count
+       (\j -> B.int16Dec j <> B.word8 0x20) -- announce index
+       cap vs ws
+     k `par` pure k
+    rep i = do
+     (v, w) <- pair
+     liftIO $ writeArray dvs i v
+     liftIO $ writeArray dws i w
+     rep $ i + 1
+   rep 0
+ kickoff (some work) >>=
+  B.hPutBuilder stdout .
+  mconcat .
+  intersperse (B.word8 0x0a) .
+  map think
+
+-- | 'GHC.Conc.par' is used for deterministic parallelism.
 -- @a `par` b@ works by beginning the reduction of @a@ in a spark that will
 -- be evaluated in parallel as @b@ is evaluated. otherwise, it's the same
 -- as @b@. in particular, @_|_ `bar` b@ is equal to @b@ (so it's not `seq`).
@@ -32,7 +71,7 @@ knap
  -> UArray Int16 Int16 -- ^ values (0-indexed)
  -> UArray Int16 Int16 -- ^ weights (0-indexed)
  -> Thought w
-knap onCount onChoice (unI16 -> maxWeight) values weights = runST entry where
+knap onCount onChoice (unI16 -> maxWeight) values !weights = runST entry where
  entry = do
   let
    realNWords = ceilq (maxWeight + 1)
@@ -62,9 +101,9 @@ knap onCount onChoice (unI16 -> maxWeight) values weights = runST entry where
     knapRow taken# vo# vi# n vn wn maxWeight
     go (n + 1)
   let
-   recon 0 _ !c m = release c m
-   recon _ 0 !c m = release c m
-   recon n w !c m | n' <- n - 1 = do
+   recon 0 !_ !c m = release c m
+   recon _ !0 !c m = release c m
+   recon n !w !c m | n' <- n - 1 = do
     -- read a single bit from the bitset.
     t <- ST $ \s0 -> case n * realNWords * wordBits + w of
      I# wx# -> case readWordArray# taken# (bOOL_INDEX wx#) s0 of
@@ -82,6 +121,7 @@ knap onCount onChoice (unI16 -> maxWeight) values weights = runST entry where
   -- backwards, reconstructing our choices.
   go 1
   recon count maxWeight 0 mempty
+{-# INLINE knap #-}
 
 unI16 :: Int16 -> Int
 unI16 = fromIntegral
@@ -139,7 +179,7 @@ knapRow taken# vo# vi# n !vn !wn wmax = do
   -- it's really important that the bitset is aligned to the word boundary.
   -- or else, memory access here can cause an "unchecked exception" (~
   -- undefined behavior).
-  go w k p | w <= wmax = do
+  go w !k p | w <= wmax = do
    vtake <- (vn +) <$> read32 (w - wn)
    vskip <-            read32  w
    let

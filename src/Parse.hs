@@ -45,6 +45,7 @@ kickoff m = do
  case x of
   Just y  -> pure y
   Nothing -> fail "Parse: unexpectedly ran out of input somewhere"
+{-# INLINE kickoff #-}
 
 option :: (Alternative m) => a -> m a -> m a
 option x = (<|> pure x)

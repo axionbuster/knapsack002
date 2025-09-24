@@ -26,6 +26,7 @@ source-repository head
 library
   exposed-modules:
       Knap
+      Parse
   other-modules:
       Paths_knapsack002
   autogen-modules:
@@ -44,7 +45,6 @@ library
 executable knapsack002-exe
   main-is: Main.hs
   other-modules:
-      Parse
       Paths_knapsack002
   autogen-modules:
       Paths_knapsack002

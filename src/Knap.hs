@@ -166,6 +166,7 @@ knapRow taken# vo# vi# n !vn !wn wmax = do
   writeW (I# i#) (W# p#) = ST $ \s0 ->
    case writeWordArray# taken# i# p# s0 of
     s1 -> (# s1, () #)
+  {-# INLINE writeW #-}
   write32 (I# i#) (I# v#) = ST $ \s0 ->
    case writeInt32Array# vo# i# (intToInt32# v#) s0 of
     s1 -> (# s1, () #)
@@ -174,6 +175,7 @@ knapRow taken# vo# vi# n !vn !wn wmax = do
    (# s1, i32# #) -> (# s1, I# (int32ToInt# i32#) #)
   {-# INLINE read32 #-}
   indexW w = realNWords * n + floorq w
+  {-# INLINE indexW #-}
   boolToW = fromIntegral . fromEnum
  let
   -- it's really important that the bitset is aligned to the word boundary.
